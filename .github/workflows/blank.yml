@@ -13,18 +13,22 @@ jobs:
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
-      - name: Checkout
+      - name: Download Repository Files
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Android SDK
+      - name: Find and Install Android SDK
         run: |
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)
+          if [ -z "$SDKMANAGER" ]; then
+            echo "Android SDK manager not found"
+            exit 1
+          fi
           yes | "$SDKMANAGER" --licenses
           "$SDKMANAGER" --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
@@ -33,9 +37,25 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Extract project
+      - name: Find Project ZIP
         run: |
-          unzip -q HUNTER_FUN_WORLD_FIXED_Project_v2.zip -d project
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname 'HUNTER_FUN_WORLD_FIXED_Project_v2.zip*' | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Project ZIP file not found"
+            echo "Files available:"
+            ls -la
+            exit 1
+          fi
+          echo "Found ZIP: $ZIP_FILE"
+          unzip -t "$ZIP_FILE"
+          mkdir -p project
+          unzip -q "$ZIP_FILE" -d project
+
+      - name: Check Project Files
+        run: |
+          test -f project/settings.gradle.kts
+          test -f project/app/build.gradle.kts
+          echo "Project files found successfully"
 
       - name: Build APK
         run: |
